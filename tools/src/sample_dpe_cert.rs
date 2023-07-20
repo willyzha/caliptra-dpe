@@ -8,7 +8,17 @@ use {
     pem::{encode_config, EncodeConfig, LineEnding, Pem},
     platform::DefaultPlatform,
     zerocopy::AsBytes,
+    clap::Parser,
 };
+
+/// Tool to generate sample DPE leaf certificate
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Issuer common name to use in the DPE leaf certificate
+    #[arg(short, long)]
+    issuer_cn: Option<String>,
+}
 
 pub struct TestEnv {
     pub crypto: OpensslCrypto,
@@ -29,18 +39,26 @@ impl DpeEnv for TestEnv {
 }
 
 fn main() {
+    let args = Args::parse();
+
+    let issuer_cn = match args.issuer_cn {
+        Some(issuer) => issuer.to_owned(),
+        None => "Sample issuer".to_owned(),
+    };
+
     let mut env = TestEnv {
         crypto: OpensslCrypto::new(),
         platform: DefaultPlatform,
     };
 
-    let mut dpe = DpeInstance::new_for_test(
+    let mut dpe = DpeInstance::new(
         &mut env,
         Support {
             auto_init: true,
             x509: true,
             ..Support::default()
         },
+        issuer_cn.as_bytes(),
     )
     .unwrap();
 
