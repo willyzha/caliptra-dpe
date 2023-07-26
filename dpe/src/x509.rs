@@ -861,7 +861,7 @@ impl X509CertWriter<'_> {
     /// Encode a KeyUsage extension
     ///
     /// https://datatracker.ietf.org/doc/html/rfc5280
-    fn encode_key_usage(&mut self) -> Result<usize, DpeErrorCode> {
+    fn encode_key_usage(&mut self, measurements: &MeasurementData) -> Result<usize, DpeErrorCode> {
         let key_usage_size = Self::get_key_usage_size(/*tagged=*/ false)?;
 
         // Encode Extension
@@ -888,9 +888,15 @@ impl X509CertWriter<'_> {
         // are used.
         bytes_written += self.encode_byte(0)?;
 
-        // Set digitalSignature bit
-        bytes_written += self.encode_byte(0x80)?;
-        bytes_written += self.encode_size_field(1)?;
+        if measurements.is_ca {
+            // Set keyCertSign bit
+            bytes_written += self.encode_byte(0x04)?;
+            bytes_written += self.encode_size_field(1)?;
+        } else {
+            // Set digitalSignature bit
+            bytes_written += self.encode_byte(0x80)?;
+            bytes_written += self.encode_size_field(1)?;
+        }
 
         Ok(bytes_written)
     }
@@ -916,7 +922,7 @@ impl X509CertWriter<'_> {
         bytes_written += self.encode_multi_tcb_info(measurements)?;
         bytes_written += self.encode_ueid(measurements)?;
         bytes_written += self.encode_basic_constraints(measurements)?;
-        bytes_written += self.encode_key_usage()?;
+        bytes_written += self.encode_key_usage(measurements)?;
 
         Ok(bytes_written)
     }
@@ -1318,7 +1324,7 @@ mod tests {
         match cert.key_usage() {
             Ok(Some(key_usage)) => {
                 assert!(key_usage.critical);
-                assert!(key_usage.value.digital_signature());
+                assert!(key_usage.value.key_cert_sign());
             }
             Ok(None) => panic!("key usage extension not found"),
             Err(_) => panic!("multiple key usage extensions found"),
